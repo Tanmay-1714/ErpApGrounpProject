@@ -15,7 +15,7 @@ public class DBConnection {
     private static final String URL = "jdbc:mysql://localhost:3306/";
     private static final String USER = "root";
     // !!! IMPORTANT: Replace this with the actual password you set !!!
-    private static final String PASSWORD = "project";
+    private static final String PASSWORD = "fuckmedaddy";
 
     // Method to get a connection to the AUTH DB
     public static Connection getAuthDBConnection() throws SQLException {

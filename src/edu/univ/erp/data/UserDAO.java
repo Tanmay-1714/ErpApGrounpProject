@@ -78,7 +78,7 @@ public class UserDAO {
                             baseUser.getUserId(),
                             baseUser.getUsername(),
                             baseUser.getRole(),
-                            rs.getInt("user_id"),
+                            rs.getInt("instructor_id"),
                             rs.getString("department")
                     );
                 }
