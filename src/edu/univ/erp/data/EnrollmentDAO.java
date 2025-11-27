@@ -1,22 +1,26 @@
-// File: edu.univ.erp.data.EnrollmentDAO.java (FINAL VERSION)
-
 package edu.univ.erp.data;
 
+import edu.univ.erp.domain.Course;
 import edu.univ.erp.domain.Enrollment;
+import edu.univ.erp.domain.Section;
 import edu.univ.erp.domain.Student;
-import edu.univ.erp.domain.Section; // NEW IMPORT REQUIRED for getMyRegistrations
-import edu.univ.erp.domain.Course;  // NEW IMPORT REQUIRED for getMyRegistrations
+
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Handles database operations for enrollments (Register, Drop, Check, Roster, Grade, MyCourses).
+ * Handles database operations for enrollments.
+ * Contains methods for Student, Instructor, and Admin features.
  */
 public class EnrollmentDAO {
 
+    // =============================================================
+    //                     STUDENT FEATURES
+    // =============================================================
+
     /**
-     * Checks if a student is already enrolled (status='Registered') in a specific section.
+     * Checks if a student is already enrolled in a specific section.
      */
     public boolean isStudentEnrolled(int studentId, int sectionId) {
         final String SQL = "SELECT 1 FROM enrollments WHERE student_id = ? AND section_id = ? AND status = 'Registered'";
@@ -35,27 +39,8 @@ public class EnrollmentDAO {
         }
     }
 
-    public boolean deleteEnrollment(int studentId, int sectionId) {
-        final String SQL = "DELETE FROM enrollments WHERE student_id = ? AND section_id = ?";
-
-        try (Connection conn = DBConnection.getERPDBConnection();
-             PreparedStatement stmt = conn.prepareStatement(SQL)) {
-
-            stmt.setInt(1, studentId);
-            stmt.setInt(2, sectionId);
-
-            // executeUpdate returns the number of rows affected. > 0 means success.
-            return stmt.executeUpdate() > 0;
-
-        } catch (SQLException e) {
-            System.err.println("Error dropping section: " + e.getMessage());
-            return false;
-        }
-    }
-
     /**
      * Registers a student into a section.
-     * @return true on success, false on database error.
      */
     public boolean registerStudent(int studentId, int sectionId) {
         final String SQL = "INSERT INTO enrollments (student_id, section_id, status) VALUES (?, ?, 'Registered')";
@@ -72,14 +57,90 @@ public class EnrollmentDAO {
         }
     }
 
-    // --- INSTRUCTOR FUNCTIONALITY ---
+    /**
+     * Drops (deletes) an enrollment for a student.
+     */
+    public boolean deleteEnrollment(int studentId, int sectionId) {
+        final String SQL = "DELETE FROM enrollments WHERE student_id = ? AND section_id = ?";
+
+        try (Connection conn = DBConnection.getERPDBConnection();
+             PreparedStatement stmt = conn.prepareStatement(SQL)) {
+
+            stmt.setInt(1, studentId);
+            stmt.setInt(2, sectionId);
+            return stmt.executeUpdate() > 0;
+
+        } catch (SQLException e) {
+            System.err.println("Error dropping section: " + e.getMessage());
+            return false;
+        }
+    }
 
     /**
-     * Retrieves the list of students enrolled in a specific section (class roster).
+     * Retrieves all courses a student has registered for.
+     */
+    public List<Enrollment> getMyRegistrations(int studentId) {
+        List<Enrollment> enrollments = new ArrayList<>();
+        final String SQL = "SELECT e.enrollment_id, e.section_id, e.grade, " +
+                "s.semester, s.year, s.day, s.time, s.room, " +
+                "c.code, c.title, c.credits, c.course_id " +
+                "FROM enrollments e " +
+                "JOIN sections s ON e.section_id = s.section_id " +
+                "JOIN courses c ON s.course_id = c.course_id " +
+                "WHERE e.student_id = ? AND e.status = 'Registered' " +
+                "ORDER BY s.year DESC, s.semester DESC";
+
+        try (Connection conn = DBConnection.getERPDBConnection();
+             PreparedStatement stmt = conn.prepareStatement(SQL)) {
+
+            stmt.setInt(1, studentId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    Course course = new Course(
+                            rs.getInt("course_id"),
+                            rs.getString("code"),
+                            rs.getString("title"),
+                            rs.getDouble("credits")
+                    );
+
+                    Section section = new Section(
+                            rs.getInt("section_id"),
+                            rs.getInt("course_id"),
+                            -1,
+                            rs.getString("day"),
+                            rs.getString("time"),
+                            rs.getString("room"),
+                            -1,
+                            rs.getString("semester"),
+                            rs.getInt("year")
+                    );
+                    section.course = course;
+
+                    Enrollment enrollment = new Enrollment(
+                            rs.getInt("enrollment_id"),
+                            studentId,
+                            rs.getInt("section_id"),
+                            rs.getString("grade")
+                    );
+                    enrollment.section = section;
+                    enrollments.add(enrollment);
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Error retrieving student registrations: " + e.getMessage());
+        }
+        return enrollments;
+    }
+
+    // =============================================================
+    //                     INSTRUCTOR FEATURES
+    // =============================================================
+
+    /**
+     * Retrieves the list of students in a specific section.
      */
     public List<Enrollment> getEnrolledStudentsBySection(int sectionId) {
         List<Enrollment> enrollments = new ArrayList<>();
-
         final String SQL = "SELECT e.enrollment_id, e.grade, e.student_id, " +
                 "u.user_id, u.username, " +
                 "s.roll_no, s.program, s.year " +
@@ -94,7 +155,6 @@ public class EnrollmentDAO {
             stmt.setInt(1, sectionId);
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    // 1. Create the Student object
                     Student student = new Student(
                             rs.getInt("user_id"),
                             rs.getString("username"),
@@ -105,26 +165,24 @@ public class EnrollmentDAO {
                             rs.getInt("year")
                     );
 
-                    // 2. Create the Enrollment record
                     Enrollment enrollment = new Enrollment(
                             rs.getInt("enrollment_id"),
                             rs.getInt("student_id"),
                             sectionId,
                             rs.getString("grade")
                     );
-
                     enrollment.student = student;
                     enrollments.add(enrollment);
                 }
             }
         } catch (SQLException e) {
-            System.err.println("Error retrieving enrolled students for section " + sectionId + ": " + e.getMessage());
+            System.err.println("Error retrieving roster: " + e.getMessage());
         }
         return enrollments;
     }
 
     /**
-     * Updates the final grade for a specific enrollment record.
+     * Updates the grade for an enrollment.
      */
     public boolean updateGrade(int enrollmentId, String grade) {
         final String SQL = "UPDATE enrollments SET grade = ? WHERE enrollment_id = ?";
@@ -134,76 +192,66 @@ public class EnrollmentDAO {
 
             stmt.setString(1, grade);
             stmt.setInt(2, enrollmentId);
-
             return stmt.executeUpdate() > 0;
         } catch (SQLException e) {
-            System.err.println("Error updating grade for enrollment ID " + enrollmentId + ": " + e.getMessage());
+            System.err.println("Error updating grade: " + e.getMessage());
             return false;
         }
     }
 
-    // --- STUDENT FUNCTIONALITY (NEW) ---
+    // =============================================================
+    //                     ADMIN FEATURES
+    // =============================================================
 
     /**
-     * Retrieves all enrollment records (including course info) for a specific student.
-     * Used by the Student Dashboard to view registered courses and final grades.
+     * Retrieves ALL enrollments in the system (for Admin View).
      */
-    public List<Enrollment> getMyRegistrations(int studentId) {
-        List<Enrollment> enrollments = new ArrayList<>();
-        // Joins enrollments with sections and courses to get all display info
-        final String SQL = "SELECT e.enrollment_id, e.section_id, e.grade, " +
-                "s.semester, s.year, s.day, s.time, s.room, " +
-                "c.code, c.title, c.credits, c.course_id " + // Added course_id
+    public List<Enrollment> getAllEnrollments() {
+        List<Enrollment> list = new ArrayList<>();
+        final String SQL = "SELECT e.enrollment_id, e.grade, e.status, " +
+                "st.student_id, st.roll_no, u.username, " +
+                "s.section_id, c.code " +
                 "FROM enrollments e " +
+                "JOIN students st ON e.student_id = st.student_id " +
+                "JOIN users_auth u ON st.user_id = u.user_id " +
                 "JOIN sections s ON e.section_id = s.section_id " +
                 "JOIN courses c ON s.course_id = c.course_id " +
-                "WHERE e.student_id = ? " +
-                "AND e.status = 'Registered' " +
-                "ORDER BY s.year DESC, s.semester DESC";
+                "ORDER BY e.enrollment_id DESC LIMIT 500";
 
         try (Connection conn = DBConnection.getERPDBConnection();
-             PreparedStatement stmt = conn.prepareStatement(SQL)) {
+             PreparedStatement stmt = conn.prepareStatement(SQL);
+             ResultSet rs = stmt.executeQuery()) {
 
-            stmt.setInt(1, studentId);
-            try (ResultSet rs = stmt.executeQuery()) {
-                while (rs.next()) {
-                    // Create Course object
-                    Course course = new Course(
-                            rs.getInt("course_id"),
-                            rs.getString("code"),
-                            rs.getString("title"),
-                            rs.getDouble("credits")
-                    );
+            while (rs.next()) {
+                // Construct Student Stub
+                Student student = new Student(
+                        0, rs.getString("username"), "Student",
+                        rs.getInt("student_id"), rs.getString("roll_no"), "", 0
+                );
 
-                    // Create Section object
-                    Section section = new Section(
-                            rs.getInt("section_id"),
-                            rs.getInt("course_id"),
-                            -1, // instructorId is not necessary here
-                            rs.getString("day"),
-                            rs.getString("time"),
-                            rs.getString("room"),
-                            -1, // capacity is not necessary here
-                            rs.getString("semester"),
-                            rs.getInt("year")
-                    );
-                    section.course = course; // Attach the course info
+                // Construct Course/Section Stub
+                Course course = new Course(0, rs.getString("code"), "", 0);
+                Section section = new Section(
+                        rs.getInt("section_id"), 0, 0, "", "", "", 0, "", 0
+                );
+                section.course = course;
 
-                    // Create the Enrollment record
-                    Enrollment enrollment = new Enrollment(
-                            rs.getInt("enrollment_id"),
-                            studentId,
-                            rs.getInt("section_id"),
-                            rs.getString("grade")
-                    );
+                // Construct Enrollment
+                Enrollment enrollment = new Enrollment(
+                        rs.getInt("enrollment_id"),
+                        rs.getInt("student_id"),
+                        rs.getInt("section_id"),
+                        rs.getString("grade")
+                );
+                enrollment.setStatus(rs.getString("status"));
+                enrollment.student = student;
+                enrollment.section = section;
 
-                    enrollment.section = section;
-                    enrollments.add(enrollment);
-                }
+                list.add(enrollment);
             }
         } catch (SQLException e) {
-            System.err.println("Error retrieving student registrations for ID " + studentId + ": " + e.getMessage());
+            System.err.println("Error listing all enrollments: " + e.getMessage());
         }
-        return enrollments;
+        return list;
     }
 }

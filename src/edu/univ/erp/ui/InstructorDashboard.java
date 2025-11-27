@@ -1,181 +1,121 @@
-// File: edu.univ.erp.ui.InstructorDashboard.java (Functional Version)
-
 package edu.univ.erp.ui;
 
-import edu.univ.erp.auth.UserSession; // REQUIRED
-import edu.univ.erp.domain.Section; // REQUIRED
-import edu.univ.erp.service.InstructorService; // REQUIRED
+import edu.univ.erp.auth.UserSession;
+import edu.univ.erp.domain.Section;
+import edu.univ.erp.service.InstructorService;
+import edu.univ.erp.util.ThemeUtils; // Theme Import
 
 import javax.swing.*;
-import javax.swing.table.DefaultTableModel; // REQUIRED for table
+import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.util.List;
 
 public class InstructorDashboard extends JFrame {
 
-    private InstructorService instructorService; // NEW FIELD
-    private JTable sectionTable;                // NEW FIELD
-    private DefaultTableModel tableModel;       // NEW FIELD
-    private JButton gradeButton;                // NEW FIELD
-    private JLabel welcomeLabel;
-    private JPanel navPanel;                    // Declared to be accessed in addListeners
+    private InstructorService instructorService;
+    private JTable sectionTable;
+    private DefaultTableModel tableModel;
+    private JButton gradeButton, viewSectionsButton, changePwdButton, logoutButton;
+    private JPanel navPanel;
 
     public InstructorDashboard(String username) {
-        this.instructorService = new InstructorService(); // INITIALIZED
+        this.instructorService = new InstructorService();
 
         setTitle("INSTRUCTOR Dashboard - " + username);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(1000, 700);
+        setSize(1100, 750);
         setLocationRelativeTo(null);
+        setLayout(new BorderLayout(15, 15));
 
-        setLayout(new BorderLayout(10, 10));
+        // --- Header ---
+        JPanel topPanel = new JPanel(new BorderLayout());
+        topPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+        
+        JLabel welcomeLabel = new JLabel("Welcome, Instructor " + username);
+        welcomeLabel.setFont(ThemeUtils.TITLE_FONT);
+        
+        topPanel.add(welcomeLabel, BorderLayout.CENTER);
+        add(topPanel, BorderLayout.NORTH);
 
-        // --- 1. Top Banner (Welcome Message) ---
-        String role = UserSession.getInstance().getRole();
-        welcomeLabel = new JLabel("Welcome, " + role + " " + username + "!", SwingConstants.CENTER);
-        welcomeLabel.setFont(new Font("Arial", Font.BOLD, 24));
-        welcomeLabel.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
-        add(welcomeLabel, BorderLayout.NORTH);
+        // --- Side Nav ---
+        navPanel = new JPanel(new GridLayout(6, 1, 10, 10));
+        navPanel.setBorder(BorderFactory.createTitledBorder("Tools"));
+        navPanel.setPreferredSize(new Dimension(200, 0));
 
-        // --- 2. Side Panel (Navigation - West) ---
-        navPanel = new JPanel();
-        navPanel.setLayout(new GridLayout(6, 1, 10, 10));
-        navPanel.setBorder(BorderFactory.createTitledBorder("Instructor Tools"));
+        viewSectionsButton = new JButton("View My Sections");
+        gradeButton = new JButton("Enter Grades");
+        changePwdButton = new JButton("Change Password");
+        logoutButton = new JButton("Logout");
 
-        // Buttons must be accessible for listeners
-        JButton viewSectionsButton = new JButton("View My Sections");
-        gradeButton = new JButton("Enter Scores/Grades"); // Set as a field
-        JButton computeGradesButton = new JButton("Compute Final Grades");
-        JButton viewStatsButton = new JButton("View Simple Statistics");
-        JButton changePwdButton = new JButton("Change Password");
-        JButton logoutButton = new JButton("Logout");
-
-        // Add buttons
+        // Simple placeholders for alignment
         navPanel.add(viewSectionsButton);
         navPanel.add(gradeButton);
-        navPanel.add(computeGradesButton);
-        navPanel.add(viewStatsButton);
+        navPanel.add(new JLabel("")); // Spacer
+        navPanel.add(new JLabel("")); // Spacer
         navPanel.add(changePwdButton);
         navPanel.add(logoutButton);
 
         add(navPanel, BorderLayout.WEST);
 
-        // --- 3. Center Panel (Section Table) ---
-
-        // Define the table model columns
-        String[] columnNames = {"Section ID", "Course Code", "Course Title", "Credits", "Schedule", "Capacity"};
-        tableModel = new DefaultTableModel(columnNames, 0) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return false; // Sections list is view-only
-            }
+        // --- Table ---
+        String[] cols = {"Section ID", "Course Code", "Title", "Credits", "Schedule", "Capacity"};
+        tableModel = new DefaultTableModel(cols, 0) {
+            public boolean isCellEditable(int r, int c) { return false; }
         };
         sectionTable = new JTable(tableModel);
         sectionTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-
+        
         JScrollPane scrollPane = new JScrollPane(sectionTable);
+        scrollPane.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         add(scrollPane, BorderLayout.CENTER);
 
-        // Initially disable the grading button until a section is loaded and selected
         gradeButton.setEnabled(false);
 
-        // Load data and setup listeners
         loadAssignedSections();
         addListeners();
+
+        // *** APPLY THEME ***
+        ThemeUtils.applyTheme(this);
 
         setVisible(true);
     }
 
-    /**
-     * Loads the assigned sections from the service layer and populates the table.
-     */
     private void loadAssignedSections() {
         tableModel.setRowCount(0);
-
-        List<Section> assignedSections = instructorService.getAssignedSections();
-
-        if (assignedSections.isEmpty()) {
-            JOptionPane.showMessageDialog(this,
-                    "You have no sections assigned for the current term.",
-                    "No Assignments",
-                    JOptionPane.INFORMATION_MESSAGE);
+        List<Section> list = instructorService.getAssignedSections();
+        if (list.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "No sections assigned.");
             return;
         }
-
-        for (Section section : assignedSections) {
-            // Ensure section.course is populated by the DAO
-            Object[] row = new Object[]{
-                    section.getSectionId(),
-                    section.course.getCode(),
-                    section.course.getTitle(),
-                    section.course.getCredits(),
-                    section.getDay() + " " + section.getTime() + " (" + section.getRoom() + ")",
-                    section.getCapacity()
-            };
-            tableModel.addRow(row);
+        for (Section s : list) {
+            tableModel.addRow(new Object[]{
+                s.getSectionId(), s.course.getCode(), s.course.getTitle(), s.course.getCredits(),
+                s.getDay() + " " + s.getTime() + " (" + s.getRoom() + ")", s.getCapacity()
+            });
         }
     }
 
-    /**
-     * Adds listeners for table selection and action buttons.
-     */
     private void addListeners() {
-        // --- 1. Table Selection Listener ---
-        // Enable grade button only when a row is selected
-        sectionTable.getSelectionModel().addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting()) {
-                gradeButton.setEnabled(sectionTable.getSelectedRow() != -1);
-            }
+        sectionTable.getSelectionModel().addListSelectionListener(e -> gradeButton.setEnabled(sectionTable.getSelectedRow() != -1));
+        
+        viewSectionsButton.addActionListener(e -> loadAssignedSections());
+        
+        gradeButton.addActionListener(e -> {
+            int row = sectionTable.getSelectedRow();
+            if (row == -1) return;
+            int secId = (int) tableModel.getValueAt(row, 0);
+            String info = (String) tableModel.getValueAt(row, 1) + " - " + tableModel.getValueAt(row, 2);
+            
+            // Note: The Dialogs won't be themed unless you update them too, or pass 'this' which helps.
+            new ManageGradesDialog(this, secId, info); 
         });
 
-        // --- 2. Button Listeners ---
-
-        // The "View My Sections" button will just call loadAssignedSections again
-        JButton viewSectionsButton = (JButton) navPanel.getComponent(0);
-        viewSectionsButton.addActionListener(e -> loadAssignedSections());
-
-        // Action to open the Grading Dialog (Index 1)
-        gradeButton.addActionListener(e -> openGradingDialog());
-
-        // TODO: Implement other buttons (Index 2-5)
-
-        // Logout Button (Index 5)
-        JButton logoutButton = (JButton) navPanel.getComponent(5);
+        changePwdButton.addActionListener(e -> new ChangePasswordDialog(this));
+        
         logoutButton.addActionListener(e -> {
             UserSession.getInstance().clearSession();
-            // Assuming your main application entry point (e.g., LoginWindow) is called here
-            // You would normally call LoginWindow.main(null); or similar
-            JOptionPane.showMessageDialog(this, "Logged out successfully.", "Logout", JOptionPane.INFORMATION_MESSAGE);
-            this.dispose();
+            dispose();
+            new LoginWindow();
         });
     }
-
-    /**
-     * Retrieves the selected section ID and opens the ManageGradesDialog.
-     */
-    private void openGradingDialog() {
-        int selectedRow = sectionTable.getSelectedRow();
-        if (selectedRow == -1) {
-            JOptionPane.showMessageDialog(this, "Please select a section first.", "Selection Error", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-
-        try {
-            // Section ID is in the first column (Index 0)
-            int sectionId = (int) tableModel.getValueAt(selectedRow, 0);
-            String courseCode = (String) tableModel.getValueAt(selectedRow, 1);
-            String courseTitle = (String) tableModel.getValueAt(selectedRow, 2);
-            String courseInfo = courseCode + " - " + courseTitle;
-
-            // ManageGradesDialog was implemented in the last step
-            ManageGradesDialog dialog = new ManageGradesDialog(this, sectionId, courseInfo);
-            dialog.setVisible(true);
-
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, "Error processing selected section.", "Error", JOptionPane.ERROR_MESSAGE);
-            ex.printStackTrace();
-        }
-    }
-
-    // Note: If you want to run this directly for testing, ensure the UserSession is mocked or pre-loaded.
 }

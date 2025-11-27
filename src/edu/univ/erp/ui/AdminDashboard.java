@@ -1,17 +1,11 @@
-// File: edu.univ.erp.ui.AdminDashboard.java (FINAL CORRECT VERSION)
-
 package edu.univ.erp.ui;
 
+import edu.univ.erp.auth.UserSession;
 import edu.univ.erp.service.AdminService;
+import edu.univ.erp.util.ThemeUtils;
+
 import javax.swing.*;
 import java.awt.*;
-
-// --- REQUIRED IMPORTS FOR ALL ADMIN DIALOGS ---
-import edu.univ.erp.ui.ManageUsersDialog;
-import edu.univ.erp.ui.ManageCoursesDialog;
-import edu.univ.erp.ui.ManageSectionsDialog;
-import edu.univ.erp.ui.AssignInstructorDialog;
-// ---------------------------------------------
 
 public class AdminDashboard extends JFrame {
 
@@ -23,152 +17,115 @@ public class AdminDashboard extends JFrame {
     public AdminDashboard(String username) {
         this.adminService = new AdminService();
 
-        setTitle("ADMINISTRATOR Dashboard - " + username);
+        setTitle("ADMIN Dashboard - " + username);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(1200, 800);
         setLocationRelativeTo(null);
+        setLayout(new BorderLayout(15, 15));
 
-        setLayout(new BorderLayout());
-
-        // --- 1. Top Panel Setup (Banner and Toggle) ---
+        // --- Top ---
         JPanel topPanel = new JPanel(new BorderLayout());
+        topPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-        // Welcome Header
-        JLabel welcomeLabel = new JLabel("System Administrator - " + username, SwingConstants.CENTER);
-        welcomeLabel.setFont(new Font("Arial", Font.BOLD, 22));
-        topPanel.add(welcomeLabel, BorderLayout.CENTER);
+        JLabel welcomeLabel = new JLabel("System Administrator");
+        welcomeLabel.setFont(ThemeUtils.TITLE_FONT);
+        topPanel.add(welcomeLabel, BorderLayout.WEST);
 
-        // Maintenance Mode Toggle Panel
-        JPanel maintenancePanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        maintenanceToggle = new JCheckBox("Maintenance Mode (View-Only)");
-        maintenancePanel.add(maintenanceToggle);
-        topPanel.add(maintenancePanel, BorderLayout.EAST);
+        maintenanceToggle = new JCheckBox("Maintenance Mode");
+        topPanel.add(maintenanceToggle, BorderLayout.EAST);
 
-        // Maintenance Banner
         bannerLabel = new JLabel("", SwingConstants.CENTER);
         bannerLabel.setOpaque(true);
-        bannerLabel.setBackground(Color.RED);
+        bannerLabel.setBackground(ThemeUtils.ERROR_RED);
         bannerLabel.setForeground(Color.WHITE);
-        bannerLabel.setFont(new Font("Arial", Font.BOLD, 14));
-        bannerLabel.setPreferredSize(new Dimension(10, 25));
+        bannerLabel.setFont(ThemeUtils.HEADER_FONT);
+        bannerLabel.setPreferredSize(new Dimension(10, 30));
 
-        // Initial state check
-        initializeMaintenanceMode();
+        JPanel northContainer = new JPanel(new BorderLayout());
+        northContainer.add(topPanel, BorderLayout.NORTH);
+        northContainer.add(bannerLabel, BorderLayout.SOUTH);
+        add(northContainer, BorderLayout.NORTH);
 
-        JPanel northPanel = new JPanel(new BorderLayout());
-        northPanel.add(topPanel, BorderLayout.NORTH);
-        northPanel.add(bannerLabel, BorderLayout.SOUTH);
+        // --- Nav ---
+        navPanel = new JPanel(new GridLayout(8, 1, 10, 15));
+        navPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        navPanel.setPreferredSize(new Dimension(250, 0));
 
-        add(northPanel, BorderLayout.NORTH);
-
-        // --- 2. Side Panel (Navigation - West) ---
-        navPanel = new JPanel();
-        navPanel.setLayout(new GridLayout(8, 1, 10, 10));
-        navPanel.setBorder(BorderFactory.createTitledBorder("Admin Management Tools"));
-
-        // Admin Features (BUTTONS)
-        navPanel.add(new JButton("Manage Users (Add/View)"));     // Index 0
-        navPanel.add(new JButton("Create Courses"));               // Index 1
-        navPanel.add(new JButton("Create Sections"));              // Index 2
-        navPanel.add(new JButton("Assign Instructors"));           // Index 3
-        navPanel.add(new JButton("View All Enrollments"));
-        navPanel.add(new JButton("System Settings/Logs"));
+        navPanel.add(new JButton("Manage Users"));
+        navPanel.add(new JButton("Create Courses"));
+        navPanel.add(new JButton("Create Sections"));
+        navPanel.add(new JButton("Assign Instructors"));
+        navPanel.add(new JButton("View Enrollments"));
+        navPanel.add(new JLabel("")); // Spacer
         navPanel.add(new JButton("Change Password"));
         navPanel.add(new JButton("Logout"));
 
         add(navPanel, BorderLayout.WEST);
 
-        // --- 3. Main Content Area (Center) ---
-        JLabel mainContent = new JLabel("Use the menu to perform system-wide management tasks.", SwingConstants.CENTER);
-        add(mainContent, BorderLayout.CENTER);
+        // --- Center ---
+        JLabel centerMsg = new JLabel("Select an option from the menu.", SwingConstants.CENTER);
+        centerMsg.setFont(ThemeUtils.HEADER_FONT);
+        add(centerMsg, BorderLayout.CENTER);
 
-        // Add Listeners
-        addToggleListener();
-        addNavigationListeners();
+        initializeMaintenanceMode();
+        addListeners();
+
+        // *** APPLY THEME ***
+        ThemeUtils.applyTheme(this);
+        if(maintenanceToggle.isSelected()) bannerLabel.setBackground(ThemeUtils.ERROR_RED);
 
         setVisible(true);
     }
 
-    /**
-     * Adds action listeners to the side navigation buttons.
-     */
-    private void addNavigationListeners() {
-        // Link "Manage Users (Add/View)" button (Index 0)
-        JButton manageUsersButton = (JButton) navPanel.getComponent(0);
-        manageUsersButton.addActionListener(e -> {
-            ManageUsersDialog dialog = new ManageUsersDialog(this);
-            dialog.setVisible(true);
+    private void addListeners() {
+        // 1. Manage Users
+        ((JButton)navPanel.getComponent(0)).addActionListener(e -> new ManageUsersDialog(this));
+        
+        // 2. Create Courses
+        ((JButton)navPanel.getComponent(1)).addActionListener(e -> new ManageCoursesDialog(this));
+        
+        // 3. Create Sections
+        ((JButton)navPanel.getComponent(2)).addActionListener(e -> new ManageSectionsDialog(this));
+        
+        // 4. Assign Instructors
+        ((JButton)navPanel.getComponent(3)).addActionListener(e -> new AssignInstructorDialog(this));
+        
+        // 5. View Enrollments
+        ((JButton)navPanel.getComponent(4)).addActionListener(e -> new ViewEnrollmentsDialog(this));
+
+        // 6. Change Password (Index 6)
+        ((JButton)navPanel.getComponent(6)).addActionListener(e -> new ChangePasswordDialog(this));
+
+        // 7. Logout (Index 7)
+        ((JButton)navPanel.getComponent(7)).addActionListener(e -> {
+            UserSession.getInstance().clearSession();
+            dispose();
+            new LoginWindow();
         });
 
-        // Link: "Create Courses" button (Index 1)
-        JButton createCoursesButton = (JButton) navPanel.getComponent(1);
-        createCoursesButton.addActionListener(e -> {
-            ManageCoursesDialog dialog = new ManageCoursesDialog(this);
-            dialog.setVisible(true);
-        });
-
-        // Link: "Create Sections" button (Index 2)
-        JButton createSectionsButton = (JButton) navPanel.getComponent(2);
-        createSectionsButton.addActionListener(e -> {
-            ManageSectionsDialog dialog = new ManageSectionsDialog(this);
-            dialog.setVisible(true);
-        });
-
-        // Link: "Assign Instructors" button (Index 3)
-        JButton assignInstructorsButton = (JButton) navPanel.getComponent(3);
-        assignInstructorsButton.addActionListener(e -> {
-            AssignInstructorDialog dialog = new AssignInstructorDialog(this);
-            dialog.setVisible(true);
-        });
-
-        // TODO: Link the remaining utility buttons (View All Enrollments, System Settings/Logs, etc.)
-    }
-
-
-    /**
-     * Initializes the toggle state and banner based on the current DB setting.
-     */
-    private void initializeMaintenanceMode() {
-        boolean isEnabled = adminService.isMaintenanceModeEnabled();
-        maintenanceToggle.setSelected(isEnabled);
-        updateMaintenanceBanner(isEnabled);
-    }
-
-    /**
-     * Updates the visual banner based on the state.
-     */
-    private void updateMaintenanceBanner(boolean isEnabled) {
-        if (isEnabled) {
-            bannerLabel.setText("!!! SYSTEM IS IN MAINTENANCE MODE: ALL WRITES ARE BLOCKED FOR STUDENTS/INSTRUCTORS !!!");
-            bannerLabel.setBackground(Color.RED);
-            bannerLabel.setVisible(true);
-        } else {
-            bannerLabel.setText("");
-            bannerLabel.setVisible(false);
-        }
-        // Force the layout to update after showing/hiding the banner
-        this.revalidate();
-        this.repaint();
-    }
-
-    /**
-     * Attaches the action listener to the maintenance toggle checkbox.
-     */
-    private void addToggleListener() {
+        // Maintenance Toggle
         maintenanceToggle.addActionListener(e -> {
             boolean newState = maintenanceToggle.isSelected();
-
-            // Call the Admin Service to update the DB
-            String result = adminService.toggleMaintenanceMode(newState);
-
-            if (result.startsWith("SUCCESS")) {
-                updateMaintenanceBanner(newState);
-                JOptionPane.showMessageDialog(this, result, "System Update", JOptionPane.INFORMATION_MESSAGE);
-            } else {
-                // If the DB update fails, revert the checkbox state
-                maintenanceToggle.setSelected(!newState);
-                JOptionPane.showMessageDialog(this, result, "System Error", JOptionPane.ERROR_MESSAGE);
-            }
+            String res = adminService.toggleMaintenanceMode(newState);
+            JOptionPane.showMessageDialog(this, res);
+            if (!res.startsWith("SUCCESS")) maintenanceToggle.setSelected(!newState);
+            updateBanner(newState);
         });
+    }
+
+    private void initializeMaintenanceMode() {
+        boolean on = adminService.isMaintenanceModeEnabled();
+        maintenanceToggle.setSelected(on);
+        updateBanner(on);
+    }
+
+    private void updateBanner(boolean on) {
+        if (on) {
+            bannerLabel.setText("!!! MAINTENANCE MODE ON - WRITES BLOCKED !!!");
+            bannerLabel.setVisible(true);
+        } else {
+            bannerLabel.setVisible(false);
+        }
+        revalidate(); repaint();
     }
 }
