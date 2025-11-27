@@ -1,9 +1,8 @@
-// File: edu.univ.erp.ui.ManageGradesDialog.java
-
 package edu.univ.erp.ui;
 
 import edu.univ.erp.domain.Enrollment;
 import edu.univ.erp.service.InstructorService;
+import edu.univ.erp.util.ThemeUtils;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -13,101 +12,100 @@ import java.util.List;
 public class ManageGradesDialog extends JDialog {
 
     private InstructorService instructorService;
-    private int sectionId;
     private JTable rosterTable;
     private DefaultTableModel tableModel;
+    private int sectionId;
 
-    public ManageGradesDialog(JFrame parent, int sectionId, String courseInfo) {
-        super(parent, "Manage Grades: " + courseInfo, true);
+    public ManageGradesDialog(JFrame parent, int sectionId, String title) {
+        super(parent, "Grades: " + title, true);
         this.instructorService = new InstructorService();
         this.sectionId = sectionId;
 
-        setSize(700, 500);
+        setSize(900, 600);
         setLocationRelativeTo(parent);
         setLayout(new BorderLayout(10, 10));
 
-        JLabel titleLabel = new JLabel("Class Roster for Section ID: " + sectionId, SwingConstants.CENTER);
-        titleLabel.setFont(new Font("Arial", Font.BOLD, 16));
-        add(titleLabel, BorderLayout.NORTH);
+        // Instructions
+        String info = "<html><center>Edit Scores (0-100) for Quiz, Midterm, Final.<br>" +
+                      "Click 'Compute & Save' to calculate final grade (Weights: 20% / 30% / 50%).</center></html>";
+        JLabel header = new JLabel(info, SwingConstants.CENTER);
+        header.setFont(ThemeUtils.REGULAR_FONT);
+        header.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
+        add(header, BorderLayout.NORTH);
 
-        // --- Center Panel (Roster Table) ---
-        String[] columnNames = {"Enrollment ID", "Roll No", "Student Name", "Program", "Current Grade"};
-        tableModel = new DefaultTableModel(columnNames, 0) {
+        // Table with Score Columns
+        // Cols: 0=ID, 1=Roll, 2=Name, 3=Quiz(Edit), 4=Mid(Edit), 5=Final(Edit), 6=Grade(Calc)
+        String[] cols = {"ID", "Roll No", "Student", "Quiz (20%)", "Midterm (30%)", "Final (50%)", "Final Grade"};
+        tableModel = new DefaultTableModel(cols, 0) {
             @Override
-            public boolean isCellEditable(int row, int column) {
-                // Only the "Current Grade" column is editable (Index 4)
-                return column == 4;
+            public boolean isCellEditable(int row, int col) {
+                return col == 3 || col == 4 || col == 5; // Only scores are editable
+            }
+            @Override
+            public Class<?> getColumnClass(int columnIndex) {
+                if (columnIndex >= 3 && columnIndex <= 5) return Double.class;
+                return String.class;
             }
         };
+        
         rosterTable = new JTable(tableModel);
+        add(new JScrollPane(rosterTable), BorderLayout.CENTER);
 
-        JScrollPane scrollPane = new JScrollPane(rosterTable);
-        add(scrollPane, BorderLayout.CENTER);
-
-        // --- Bottom Panel (Action) ---
-        JButton submitButton = new JButton("Submit Grade Changes");
-        submitButton.addActionListener(e -> handleSubmitGrades());
-        add(submitButton, BorderLayout.SOUTH);
+        // Button
+        JButton btn = new JButton("Compute & Save All");
+        btn.addActionListener(e -> submit());
+        JPanel south = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        south.add(btn);
+        add(south, BorderLayout.SOUTH);
 
         loadRoster();
+        ThemeUtils.applyTheme(this.getContentPane());
         setVisible(true);
     }
 
-    /**
-     * Loads the class roster from the service layer.
-     */
     private void loadRoster() {
-        tableModel.setRowCount(0); // Clear table
-
-        List<Enrollment> roster = instructorService.getEnrolledStudents(sectionId);
-
-        for (Enrollment enrollment : roster) {
-            Object[] row = new Object[]{
-                    enrollment.getEnrollmentId(),
-                    enrollment.student.getRollNo(),
-                    enrollment.student.getUsername(), // Using username as name placeholder
-                    enrollment.student.getProgram(),
-                    enrollment.getGrade() != null ? enrollment.getGrade() : "" // Display existing grade or blank
-            };
-            tableModel.addRow(row);
+        tableModel.setRowCount(0);
+        List<Enrollment> list = instructorService.getEnrolledStudents(sectionId);
+        for(Enrollment e : list) {
+            tableModel.addRow(new Object[]{
+                e.getEnrollmentId(), 
+                e.student.getRollNo(), 
+                e.student.getUsername(),
+                e.getScoreQuiz(),     // Col 3
+                e.getScoreMidterm(),  // Col 4
+                e.getScoreFinal(),    // Col 5
+                e.getGrade() == null ? "-" : e.getGrade() // Col 6
+            });
         }
     }
 
-    /**
-     * Processes changes in the 'Current Grade' column and submits them.
-     */
-    private void handleSubmitGrades() {
-        int rowsUpdated = 0;
-        int rowCount = tableModel.getRowCount();
-
-        for (int i = 0; i < rowCount; i++) {
+    private void submit() {
+        int count = 0;
+        if (rosterTable.isEditing()) rosterTable.getCellEditor().stopCellEditing();
+        
+        for(int i=0; i<tableModel.getRowCount(); i++) {
             try {
-                int enrollmentId = (int) tableModel.getValueAt(i, 0);
-                String newGrade = tableModel.getValueAt(i, 4).toString().trim(); // Grade is in column index 4
+                int eid = (int)tableModel.getValueAt(i, 0);
+                
+                double q = parseScore(tableModel.getValueAt(i, 3));
+                double m = parseScore(tableModel.getValueAt(i, 4));
+                double f = parseScore(tableModel.getValueAt(i, 5));
 
-                // Only attempt update if grade is not empty and has changed (simple check)
-                if (!newGrade.isEmpty()) {
-                    String result = instructorService.submitGrade(enrollmentId, newGrade);
-
-                    if (result.startsWith("SUCCESS")) {
-                        rowsUpdated++;
-                    } else if (!result.contains("Invalid grade format")) {
-                        // Log unexpected errors but continue processing
-                        System.err.println("Failed to update grade for Enrollment ID " + enrollmentId + ": " + result);
-                    }
-                }
+                String res = instructorService.updateStudentScore(eid, q, m, f);
+                if(res.startsWith("SUCCESS")) count++;
+                
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, "Error processing grade submission on row " + (i+1) + ".", "Error", JOptionPane.ERROR_MESSAGE);
-                ex.printStackTrace();
+                System.err.println("Error processing row " + i);
             }
         }
+        JOptionPane.showMessageDialog(this, "Updated " + count + " student records.");
+        loadRoster(); // Reload
+    }
 
-        if (rowsUpdated > 0) {
-            JOptionPane.showMessageDialog(this, rowsUpdated + " grade(s) submitted successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
-            // Reload the roster to confirm changes (optional, but good practice)
-            loadRoster();
-        } else {
-            JOptionPane.showMessageDialog(this, "No valid grade changes were submitted or found.", "Warning", JOptionPane.WARNING_MESSAGE);
-        }
+    private double parseScore(Object obj) {
+        if (obj == null) return 0.0;
+        if (obj instanceof Number) return ((Number) obj).doubleValue();
+        try { return Double.parseDouble(obj.toString()); } 
+        catch (Exception e) { return 0.0; }
     }
 }

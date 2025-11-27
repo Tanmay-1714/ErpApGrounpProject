@@ -8,124 +8,81 @@ import javax.swing.*;
 import java.awt.*;
 
 public class AdminDashboard extends JFrame {
-
     private AdminService adminService;
     private JCheckBox maintenanceToggle;
     private JLabel bannerLabel;
     private JPanel navPanel;
 
     public AdminDashboard(String username) {
-        this.adminService = new AdminService();
-
+        adminService = new AdminService();
         setTitle("ADMIN Dashboard - " + username);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(1200, 800);
         setLocationRelativeTo(null);
         setLayout(new BorderLayout(15, 15));
 
-        // --- Top ---
         JPanel topPanel = new JPanel(new BorderLayout());
         topPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-
-        JLabel welcomeLabel = new JLabel("System Administrator");
-        welcomeLabel.setFont(ThemeUtils.TITLE_FONT);
-        topPanel.add(welcomeLabel, BorderLayout.WEST);
+        JLabel welcome = new JLabel("System Administrator");
+        welcome.setFont(ThemeUtils.TITLE_FONT);
+        topPanel.add(welcome, BorderLayout.WEST);
 
         maintenanceToggle = new JCheckBox("Maintenance Mode");
+        maintenanceToggle.setSelected(adminService.isMaintenanceModeEnabled());
         topPanel.add(maintenanceToggle, BorderLayout.EAST);
 
-        bannerLabel = new JLabel("", SwingConstants.CENTER);
+        bannerLabel = new JLabel("MAINTENANCE MODE ON", SwingConstants.CENTER);
         bannerLabel.setOpaque(true);
         bannerLabel.setBackground(ThemeUtils.ERROR_RED);
         bannerLabel.setForeground(Color.WHITE);
-        bannerLabel.setFont(ThemeUtils.HEADER_FONT);
-        bannerLabel.setPreferredSize(new Dimension(10, 30));
+        bannerLabel.setVisible(maintenanceToggle.isSelected());
 
-        JPanel northContainer = new JPanel(new BorderLayout());
-        northContainer.add(topPanel, BorderLayout.NORTH);
-        northContainer.add(bannerLabel, BorderLayout.SOUTH);
-        add(northContainer, BorderLayout.NORTH);
+        JPanel north = new JPanel(new BorderLayout());
+        north.add(topPanel, BorderLayout.NORTH);
+        north.add(bannerLabel, BorderLayout.SOUTH);
+        add(north, BorderLayout.NORTH);
 
-        // --- Nav ---
         navPanel = new JPanel(new GridLayout(8, 1, 10, 15));
-        navPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
         navPanel.setPreferredSize(new Dimension(250, 0));
-
-        navPanel.add(new JButton("Manage Users"));
-        navPanel.add(new JButton("Create Courses"));
-        navPanel.add(new JButton("Create Sections"));
-        navPanel.add(new JButton("Assign Instructors"));
-        navPanel.add(new JButton("View Enrollments"));
-        navPanel.add(new JLabel("")); // Spacer
-        navPanel.add(new JButton("Change Password"));
-        navPanel.add(new JButton("Logout"));
-
+        String[] btns = {"Manage Users", "Create Courses", "Create Sections", "Assign Instructors", "View Enrollments", " ", "Change Password", "Logout"};
+        for(String b : btns) {
+            if(b.equals(" ")) navPanel.add(new JLabel(""));
+            else navPanel.add(new JButton(b));
+        }
         add(navPanel, BorderLayout.WEST);
+        add(new JLabel("Select an option.", SwingConstants.CENTER), BorderLayout.CENTER);
 
-        // --- Center ---
-        JLabel centerMsg = new JLabel("Select an option from the menu.", SwingConstants.CENTER);
-        centerMsg.setFont(ThemeUtils.HEADER_FONT);
-        add(centerMsg, BorderLayout.CENTER);
-
-        initializeMaintenanceMode();
         addListeners();
-
-        // *** APPLY THEME ***
         ThemeUtils.applyTheme(this);
         if(maintenanceToggle.isSelected()) bannerLabel.setBackground(ThemeUtils.ERROR_RED);
-
         setVisible(true);
     }
 
     private void addListeners() {
-        // 1. Manage Users
-        ((JButton)navPanel.getComponent(0)).addActionListener(e -> new ManageUsersDialog(this));
-        
-        // 2. Create Courses
-        ((JButton)navPanel.getComponent(1)).addActionListener(e -> new ManageCoursesDialog(this));
-        
-        // 3. Create Sections
-        ((JButton)navPanel.getComponent(2)).addActionListener(e -> new ManageSectionsDialog(this));
-        
-        // 4. Assign Instructors
-        ((JButton)navPanel.getComponent(3)).addActionListener(e -> new AssignInstructorDialog(this));
-        
-        // 5. View Enrollments
-        ((JButton)navPanel.getComponent(4)).addActionListener(e -> new ViewEnrollmentsDialog(this));
-
-        // 6. Change Password (Index 6)
-        ((JButton)navPanel.getComponent(6)).addActionListener(e -> new ChangePasswordDialog(this));
-
-        // 7. Logout (Index 7)
-        ((JButton)navPanel.getComponent(7)).addActionListener(e -> {
-            UserSession.getInstance().clearSession();
-            dispose();
-            new LoginWindow();
-        });
-
-        // Maintenance Toggle
         maintenanceToggle.addActionListener(e -> {
-            boolean newState = maintenanceToggle.isSelected();
-            String res = adminService.toggleMaintenanceMode(newState);
+            boolean on = maintenanceToggle.isSelected();
+            String res = adminService.toggleMaintenanceMode(on);
             JOptionPane.showMessageDialog(this, res);
-            if (!res.startsWith("SUCCESS")) maintenanceToggle.setSelected(!newState);
-            updateBanner(newState);
+            if(!res.startsWith("SUCCESS")) maintenanceToggle.setSelected(!on);
+            bannerLabel.setVisible(maintenanceToggle.isSelected());
         });
-    }
 
-    private void initializeMaintenanceMode() {
-        boolean on = adminService.isMaintenanceModeEnabled();
-        maintenanceToggle.setSelected(on);
-        updateBanner(on);
-    }
-
-    private void updateBanner(boolean on) {
-        if (on) {
-            bannerLabel.setText("!!! MAINTENANCE MODE ON - WRITES BLOCKED !!!");
-            bannerLabel.setVisible(true);
-        } else {
-            bannerLabel.setVisible(false);
+        // Helper to get buttons safely
+        JButton[] buttons = new JButton[7];
+        int idx = 0;
+        for(Component c : navPanel.getComponents()) {
+            if(c instanceof JButton) buttons[idx++] = (JButton)c;
         }
-        revalidate(); repaint();
+
+        buttons[0].addActionListener(e -> new ManageUsersDialog(this));
+        buttons[1].addActionListener(e -> new ManageCoursesDialog(this));
+        buttons[2].addActionListener(e -> new ManageSectionsDialog(this));
+        buttons[3].addActionListener(e -> new AssignInstructorDialog(this));
+        buttons[4].addActionListener(e -> new ViewEnrollmentsDialog(this));
+        buttons[5].addActionListener(e -> new ChangePasswordDialog(this));
+        buttons[6].addActionListener(e -> {
+            UserSession.getInstance().clearSession();
+            dispose(); new LoginWindow();
+        });
     }
 }

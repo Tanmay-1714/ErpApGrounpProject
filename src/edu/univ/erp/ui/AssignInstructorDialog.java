@@ -1,8 +1,7 @@
-// File: edu.univ.erp.ui.AssignInstructorDialog.java
-
 package edu.univ.erp.ui;
 
 import edu.univ.erp.service.AdminService;
+import edu.univ.erp.util.ThemeUtils; // Import Theme
 
 import javax.swing.*;
 import java.awt.*;
@@ -10,64 +9,47 @@ import java.awt.*;
 public class AssignInstructorDialog extends JDialog {
 
     private AdminService adminService;
-    private JTextField sectionIdField;
-    private JTextField instructorIdField;
+    private JTextField sectionIdField, instructorIdField;
 
     public AssignInstructorDialog(JFrame parent) {
-        super(parent, "Admin: Assign Instructor to Section", true);
-        this.adminService = new AdminService();
-
-        setSize(400, 250);
+        super(parent, "Admin: Assign Instructor", true);
+        adminService = new AdminService();
+        setSize(400, 200);
         setLocationRelativeTo(parent);
-        setLayout(new BorderLayout(10, 10));
+        setLayout(new BorderLayout(15, 15));
 
-        // --- Input Panel ---
-        JPanel inputPanel = new JPanel(new GridLayout(3, 2, 10, 10));
-        inputPanel.setBorder(BorderFactory.createTitledBorder("Assignment Details"));
+        JPanel panel = new JPanel(new GridLayout(2, 2, 10, 10));
+        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
-        sectionIdField = new JTextField(10);
-        instructorIdField = new JTextField(10);
+        sectionIdField = new JTextField();
+        instructorIdField = new JTextField();
 
-        inputPanel.add(new JLabel("Section ID to Assign:"));
-        inputPanel.add(sectionIdField);
-        inputPanel.add(new JLabel("Instructor ID:"));
-        inputPanel.add(instructorIdField);
+        panel.add(new JLabel("Section ID:"));     panel.add(sectionIdField);
+        panel.add(new JLabel("Instructor ID:"));  panel.add(instructorIdField);
 
-        JButton assignButton = new JButton("Assign Instructor");
-        inputPanel.add(new JLabel("")); // Spacer
-        inputPanel.add(assignButton);
+        add(panel, BorderLayout.CENTER);
 
-        add(inputPanel, BorderLayout.NORTH);
+        JButton btn = new JButton("Assign");
+        btn.addActionListener(e -> assign());
+        JPanel south = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        south.add(btn);
+        add(south, BorderLayout.SOUTH);
 
-        // --- Action Listener ---
-        assignButton.addActionListener(e -> handleAssignInstructor());
+        // *** APPLY THEME ***
+        ThemeUtils.applyTheme(this.getContentPane());
 
         setVisible(true);
     }
 
-    private void handleAssignInstructor() {
-        int sectionId;
-        int instructorId;
-
-        // Get and validate input
+    private void assign() {
         try {
-            sectionId = Integer.parseInt(sectionIdField.getText().trim());
-            instructorId = Integer.parseInt(instructorIdField.getText().trim());
-        } catch (NumberFormatException ex) {
-            JOptionPane.showMessageDialog(this, "Both Section ID and Instructor ID must be valid numbers.", "Input Error", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-
-        // Call the Admin Service
-        String result = adminService.assignInstructor(sectionId, instructorId);
-
-        // Display result
-        if (result.startsWith("SUCCESS")) {
-            JOptionPane.showMessageDialog(this, result, "Assignment Success", JOptionPane.INFORMATION_MESSAGE);
-            sectionIdField.setText("");
-            instructorIdField.setText("");
-        } else {
-            JOptionPane.showMessageDialog(this, result, "Assignment Failed", JOptionPane.ERROR_MESSAGE);
+            int sid = Integer.parseInt(sectionIdField.getText());
+            int iid = Integer.parseInt(instructorIdField.getText());
+            String res = adminService.assignInstructor(sid, iid);
+            JOptionPane.showMessageDialog(this, res);
+            if(res.startsWith("SUCCESS")) dispose();
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "IDs must be numbers.");
         }
     }
 }

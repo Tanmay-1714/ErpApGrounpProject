@@ -6,7 +6,6 @@ import javax.swing.border.LineBorder;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.JTableHeader;
 import java.awt.*;
-import java.util.Enumeration;
 
 public class ThemeUtils {
 
@@ -25,7 +24,7 @@ public class ThemeUtils {
     public static final Font BUTTON_FONT = new Font("Segoe UI", Font.BOLD, 13);
 
     /**
-     * recursively applies the theme to a container and all its children.
+     * Recursively applies the theme to a container and all its children.
      */
     public static void applyTheme(Container container) {
         container.setBackground(BG_COLOR);
@@ -58,7 +57,7 @@ public class ThemeUtils {
             } else if (c instanceof JTabbedPane) {
                 c.setFont(HEADER_FONT);
                 c.setForeground(ACCENT_BLACK);
-                // TabbedPane content needs specific handling usually, but recursion helps
+                c.setBackground(BG_COLOR);
             }
         }
     }
