@@ -4,79 +4,49 @@ import edu.univ.erp.auth.AuthService;
 import edu.univ.erp.auth.UserSession;
 import edu.univ.erp.data.*;
 import edu.univ.erp.domain.Enrollment;
-
 import java.util.List;
 
 public class AdminService {
-
-    private SystemDAO systemDAO;
-    private AuthService authService;
-    private UserDAO userDAO;
-    private CourseDAO courseDAO;
-    private SectionDAO sectionDAO;
-    private EnrollmentDAO enrollmentDAO;
-
-    public AdminService() {
-        this.systemDAO = new SystemDAO();
-        this.authService = new AuthService();
-        this.userDAO = new UserDAO();
-        this.courseDAO = new CourseDAO();
-        this.sectionDAO = new SectionDAO();
-        this.enrollmentDAO = new EnrollmentDAO();
-    }
+    private SystemDAO systemDAO = new SystemDAO();
+    private AuthService authService = new AuthService();
+    private UserDAO userDAO = new UserDAO();
+    private CourseDAO courseDAO = new CourseDAO();
+    private SectionDAO sectionDAO = new SectionDAO();
+    private EnrollmentDAO enrollmentDAO = new EnrollmentDAO();
 
     public String toggleMaintenanceMode(boolean enabled) {
-        if (!"Admin".equals(UserSession.getInstance().getRole())) return "FAILURE: Unauthorized.";
-        if (systemDAO.setMaintenanceMode(enabled)) {
-            return "SUCCESS: Maintenance Mode set to " + (enabled ? "ON" : "OFF") + ".";
+        if (!"Admin".equals(UserSession.getInstance().getRole())) return "FAILURE";
+        return systemDAO.setMaintenanceMode(enabled) ? "SUCCESS: Maintenance " + (enabled ? "ON" : "OFF") : "ERROR";
+    }
+
+    public boolean isMaintenanceModeEnabled() { return systemDAO.isMaintenanceModeEnabled(); }
+
+    public String createNewUser(String u, String p, String r, String... details) {
+        if (!"Admin".equals(UserSession.getInstance().getRole())) return "FAILURE";
+        int uid = authService.createBaseUser(u, p, r);
+        if (uid == -1) return "FAILURE: User exists.";
+        
+        boolean ok = false;
+        if ("Student".equalsIgnoreCase(r) && details.length >= 3) {
+            try { ok = userDAO.createStudentProfile(uid, details[0], details[1], Integer.parseInt(details[2])); } 
+            catch (Exception e) {}
+        } else if ("Instructor".equalsIgnoreCase(r) && details.length >= 1) {
+            ok = userDAO.createInstructorProfile(uid, details[0]);
         }
-        return "ERROR: Database update failed.";
+        return ok ? "SUCCESS" : "FAILURE: Profile Error";
     }
 
-    public boolean isMaintenanceModeEnabled() {
-        return systemDAO.isMaintenanceModeEnabled();
+    public String createNewCourse(String c, String t, double cr) {
+        return courseDAO.createCourse(c, t, cr) ? "SUCCESS" : "FAILURE";
     }
 
-    public String createNewUser(String username, String password, String role, String... profileDetails) {
-        if (!"Admin".equals(UserSession.getInstance().getRole())) return "FAILURE: Unauthorized.";
-
-        int newUserId = authService.createBaseUser(username, password, role);
-        if (newUserId == -1) return "FAILURE: User creation failed (Username exists?).";
-
-        boolean success = false;
-        if ("Student".equalsIgnoreCase(role) && profileDetails.length >= 3) {
-            try {
-                int year = Integer.parseInt(profileDetails[2]);
-                success = userDAO.createStudentProfile(newUserId, profileDetails[0], profileDetails[1], year);
-            } catch (NumberFormatException e) { return "FAILURE: Invalid Year."; }
-        } else if ("Instructor".equalsIgnoreCase(role) && profileDetails.length >= 1) {
-            success = userDAO.createInstructorProfile(newUserId, profileDetails[0]);
-        } else {
-            return "FAILURE: Invalid role details.";
-        }
-        return success ? "SUCCESS: User created." : "FAILURE: Profile creation failed.";
+    public String createNewSection(int cid, String d, String t, String r, int cap, String s, int y) {
+        return sectionDAO.createSection(cid, d, t, r, cap, s, y) ? "SUCCESS" : "FAILURE";
     }
 
-    public String createNewCourse(String code, String title, double credits) {
-        if (!"Admin".equals(UserSession.getInstance().getRole())) return "FAILURE: Unauthorized.";
-        if (courseDAO.createCourse(code, title, credits)) return "SUCCESS: Course created.";
-        return "FAILURE: Course creation failed.";
+    public String assignInstructor(int sid, int iid) {
+        return sectionDAO.assignInstructorToSection(sid, iid) ? "SUCCESS" : "FAILURE";
     }
 
-    public String createNewSection(int courseId, String day, String time, String room, int capacity, String semester, int year) {
-        if (!"Admin".equals(UserSession.getInstance().getRole())) return "FAILURE: Unauthorized.";
-        if (sectionDAO.createSection(courseId, day, time, room, capacity, semester, year)) return "SUCCESS: Section created.";
-        return "FAILURE: Section creation failed.";
-    }
-
-    public String assignInstructor(int sectionId, int instructorId) {
-        if (!"Admin".equals(UserSession.getInstance().getRole())) return "FAILURE: Unauthorized.";
-        if (sectionDAO.assignInstructorToSection(sectionId, instructorId)) return "SUCCESS: Instructor assigned.";
-        return "FAILURE: Assignment failed.";
-    }
-
-    public List<Enrollment> getAllEnrollments() {
-        if (!"Admin".equals(UserSession.getInstance().getRole())) return List.of();
-        return enrollmentDAO.getAllEnrollments();
-    }
+    public List<Enrollment> getAllEnrollments() { return enrollmentDAO.getAllEnrollments(); }
 }

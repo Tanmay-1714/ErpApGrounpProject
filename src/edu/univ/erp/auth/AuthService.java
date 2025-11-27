@@ -1,122 +1,70 @@
 package edu.univ.erp.auth;
 
-// File: edu.univ.erp.auth.AuthService.java
-
 import edu.univ.erp.data.DBConnection;
 import org.mindrot.jbcrypt.BCrypt;
 import java.sql.*;
+import java.time.LocalDateTime;
 
 public class AuthService {
+    private static final int MAX_ATTEMPTS = 5;
 
-  /**
-   * Attempts to log in a user.
-   * @return The user's role (Admin, Instructor, Student) or null if login fails.
-   */
-  public String authenticate(String username, String password) {
-    // 1. Get a connection to the Auth DB
-    try (Connection conn = DBConnection.getAuthDBConnection();
-        PreparedStatement stmt = conn.prepareStatement(
-          "SELECT password_hash, role FROM users_auth WHERE username = ?")) {
+    public String authenticate(String username, String password) {
+        try (Connection conn = DBConnection.getAuthDBConnection();
+             PreparedStatement stmt = conn.prepareStatement("SELECT password_hash, role, failed_attempts, lockout_time FROM users_auth WHERE username = ?")) {
+            stmt.setString(1, username);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (!rs.next()) return null;
+                
+                Timestamp lockout = rs.getTimestamp("lockout_time");
+                if (lockout != null && lockout.toLocalDateTime().isAfter(LocalDateTime.now())) return "LOCKED";
 
-      // 2. Query the hash and role for the given username
-      stmt.setString(1, username);
-      try (ResultSet rs = stmt.executeQuery()) {
-
-        if (!rs.next()) {
-          // User not found
-          return null;
-        }
-
-        String storedHash = rs.getString("password_hash");
-        String role = rs.getString("role");
-
-        // 3. Verify the input password against the stored hash using BCrypt
-        if (BCrypt.checkpw(password, storedHash)) {
-          return role; // Login successful!
-        } else {
-          return null; // Password mismatch
-        }
-      }
-    } catch (SQLException e) {
-      System.err.println("Error during authentication: " + e.getMessage());
-      return null;
+                if (BCrypt.checkpw(password, rs.getString("password_hash"))) {
+                    resetLockout(username);
+                    return rs.getString("role");
+                } else {
+                    handleFailedLogin(username, rs.getInt("failed_attempts"));
+                    return null;
+                }
+            }
+        } catch (SQLException e) { e.printStackTrace(); return null; }
     }
-  }
 
-  // --- THE MISSING METHOD FIXING YOUR ERROR ---
-
-  /**
-   * Creates a new user record in the Authentication Database.
-   * @param username The new username.
-   * @param password The raw password (will be hashed).
-   * @param role The user's role (Student, Instructor, Admin).
-   * @return The generated user_id, or -1 if creation failed.
-   */
-  public int createBaseUser(String username, String password, String role) {
-    // 1. Hash the password
-    String passwordHash = BCrypt.hashpw(password, BCrypt.gensalt());
-
-    // 2. Prepare SQL to insert into Auth DB
-    final String SQL = "INSERT INTO users_auth (username, role, password_hash) VALUES (?, ?, ?)";
-
-    try (Connection conn = DBConnection.getAuthDBConnection();
-        // RETURN_GENERATED_KEYS allows us to get the new auto-increment ID back
-        PreparedStatement stmt = conn.prepareStatement(SQL, Statement.RETURN_GENERATED_KEYS)) {
-
-      stmt.setString(1, username);
-      stmt.setString(2, role);
-      stmt.setString(3, passwordHash);
-
-      int affectedRows = stmt.executeUpdate();
-
-      if (affectedRows == 0) {
-        return -1; // Creating user failed, no rows affected
-      }
-
-      // 3. Retrieve the new user_id to link with the Profile DB later
-      try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
-        if (generatedKeys.next()) {
-          return generatedKeys.getInt(1);
-        } else {
-          return -1; // Creating user failed, no ID obtained
-        }
-      }
-    } catch (SQLException e) {
-      System.err.println("Error creating base user: " + e.getMessage());
-      return -1;
+    private void handleFailedLogin(String username, int attempts) {
+        try (Connection conn = DBConnection.getAuthDBConnection();
+             PreparedStatement stmt = conn.prepareStatement("UPDATE users_auth SET failed_attempts = ?, lockout_time = ? WHERE username = ?")) {
+            int newAttempts = attempts + 1;
+            stmt.setInt(1, newAttempts);
+            stmt.setTimestamp(2, newAttempts >= MAX_ATTEMPTS ? Timestamp.valueOf(LocalDateTime.now().plusMinutes(5)) : null);
+            stmt.setString(3, username);
+            stmt.executeUpdate();
+        } catch (SQLException e) { e.printStackTrace(); }
     }
-  }
-  // File: src/edu/univ/erp/auth/AuthService.java
 
-  /**
-   * Changes the password for a user in the Authentication Database.
-   * NOTE: This method does NOT check the old password, that is handled in the UI/Service layer.
-   * @param username The username whose password needs changing.
-   * @param newPassword The raw new password (will be hashed).
-   * @return true if the password was successfully updated, false otherwise.
-   */
-  public boolean changePassword(String username, String newPassword) {
-    // 1. Hash the new password
-    String newHash = BCrypt.hashpw(newPassword, BCrypt.gensalt());
-
-    // 2. Prepare SQL UPDATE statement
-    // The query is short because we only update the password_hash based on the username.
-    final String SQL = "UPDATE users_auth SET password_hash = ? WHERE username = ?";
-
-    try (Connection conn = DBConnection.getAuthDBConnection();
-        PreparedStatement stmt = conn.prepareStatement(SQL)) {
-
-      stmt.setString(1, newHash);
-      stmt.setString(2, username);
-
-      int affectedRows = stmt.executeUpdate();
-
-      // Check if exactly one row was updated
-      return affectedRows > 0;
-
-    } catch (SQLException e) {
-      System.err.println("Error changing password for user " + username + ": " + e.getMessage());
-      return false;
+    private void resetLockout(String username) {
+        try (Connection conn = DBConnection.getAuthDBConnection();
+             PreparedStatement stmt = conn.prepareStatement("UPDATE users_auth SET failed_attempts = 0, lockout_time = NULL WHERE username = ?")) {
+            stmt.setString(1, username); stmt.executeUpdate();
+        } catch (SQLException e) { e.printStackTrace(); }
     }
-  }
+
+    public boolean changePassword(String username, String newPass) {
+        try (Connection conn = DBConnection.getAuthDBConnection();
+             PreparedStatement stmt = conn.prepareStatement("UPDATE users_auth SET password_hash = ? WHERE username = ?")) {
+            stmt.setString(1, BCrypt.hashpw(newPass, BCrypt.gensalt()));
+            stmt.setString(2, username);
+            return stmt.executeUpdate() > 0;
+        } catch (SQLException e) { return false; }
+    }
+
+    public int createBaseUser(String username, String password, String role) {
+        try (Connection conn = DBConnection.getAuthDBConnection();
+             PreparedStatement stmt = conn.prepareStatement("INSERT INTO users_auth (username, role, password_hash) VALUES (?, ?, ?)", Statement.RETURN_GENERATED_KEYS)) {
+            stmt.setString(1, username); stmt.setString(2, role); stmt.setString(3, BCrypt.hashpw(password, BCrypt.gensalt()));
+            if (stmt.executeUpdate() > 0) {
+                ResultSet rs = stmt.getGeneratedKeys();
+                if (rs.next()) return rs.getInt(1);
+            }
+        } catch (SQLException e) { e.printStackTrace(); }
+        return -1;
+    }
 }

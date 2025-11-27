@@ -1,7 +1,7 @@
 package edu.univ.erp.ui;
 
 import edu.univ.erp.service.AdminService;
-import edu.univ.erp.util.ThemeUtils; // Import Theme
+import edu.univ.erp.util.ThemeUtils;
 
 import javax.swing.*;
 import java.awt.*;
@@ -16,37 +16,26 @@ public class ManageUsersDialog extends JDialog {
     private CardLayout cardLayout;
 
     public ManageUsersDialog(JFrame parent) {
-        super(parent, "Admin: Create New User", true);
-        this.adminService = new AdminService();
-
-        setSize(550, 450);
+        super(parent, "Admin: Create User", true);
+        adminService = new AdminService();
+        setSize(550, 500);
         setLocationRelativeTo(parent);
         setLayout(new BorderLayout(15, 15));
 
-        // --- Header ---
-        JLabel title = new JLabel("Create New User", SwingConstants.CENTER);
-        title.setFont(ThemeUtils.HEADER_FONT);
-        title.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
-        add(title, BorderLayout.NORTH);
-
-        // --- Credentials Panel ---
-        JPanel mainInputPanel = new JPanel(new GridLayout(3, 2, 10, 10));
-        mainInputPanel.setBorder(BorderFactory.createTitledBorder("Credentials"));
-
+        // Inputs
+        JPanel creds = new JPanel(new GridLayout(3, 2, 10, 10));
+        creds.setBorder(BorderFactory.createTitledBorder("Credentials"));
         usernameField = new JTextField();
         passwordField = new JPasswordField();
         roleComboBox = new JComboBox<>(new String[]{"Student", "Instructor"});
+        creds.add(new JLabel("Username:")); creds.add(usernameField);
+        creds.add(new JLabel("Password:")); creds.add(passwordField);
+        creds.add(new JLabel("Role:"));     creds.add(roleComboBox);
 
-        mainInputPanel.add(new JLabel("Username:")); mainInputPanel.add(usernameField);
-        mainInputPanel.add(new JLabel("Password:")); mainInputPanel.add(passwordField);
-        mainInputPanel.add(new JLabel("Role:"));     mainInputPanel.add(roleComboBox);
-
-        // --- Dynamic Panels ---
         cardLayout = new CardLayout();
         dynamicPanel = new JPanel(cardLayout);
         dynamicPanel.setBorder(BorderFactory.createTitledBorder("Profile Details"));
 
-        // Student Panel
         studentPanel = new JPanel(new GridLayout(3, 2, 10, 10));
         rollNoField = new JTextField();
         programField = new JTextField();
@@ -55,7 +44,6 @@ public class ManageUsersDialog extends JDialog {
         studentPanel.add(new JLabel("Program:")); studentPanel.add(programField);
         studentPanel.add(new JLabel("Year:"));    studentPanel.add(yearField);
 
-        // Instructor Panel
         instructorPanel = new JPanel(new GridLayout(1, 2, 10, 10));
         departmentField = new JTextField();
         instructorPanel.add(new JLabel("Department:")); instructorPanel.add(departmentField);
@@ -63,41 +51,34 @@ public class ManageUsersDialog extends JDialog {
         dynamicPanel.add(studentPanel, "Student");
         dynamicPanel.add(instructorPanel, "Instructor");
 
-        // Wrapper for inputs
-        JPanel centerPanel = new JPanel(new BorderLayout(10,10));
-        centerPanel.setBorder(BorderFactory.createEmptyBorder(10,10,10,10));
-        centerPanel.add(mainInputPanel, BorderLayout.NORTH);
-        centerPanel.add(dynamicPanel, BorderLayout.CENTER);
-        add(centerPanel, BorderLayout.CENTER);
+        JPanel center = new JPanel(new BorderLayout(10,10));
+        center.setBorder(BorderFactory.createEmptyBorder(10,10,10,10));
+        center.add(creds, BorderLayout.NORTH);
+        center.add(dynamicPanel, BorderLayout.CENTER);
+        add(center, BorderLayout.CENTER);
 
-        // --- Bottom Panel ---
-        JButton createButton = new JButton("Create User");
-        createButton.addActionListener(e -> handleCreateUser());
+        JButton btn = new JButton("Create User");
+        btn.addActionListener(e -> create());
         JPanel south = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        south.add(createButton);
+        south.add(btn);
         add(south, BorderLayout.SOUTH);
 
-        // Logic
-        roleComboBox.addActionListener(e -> cardLayout.show(dynamicPanel, (String) roleComboBox.getSelectedItem()));
-        
-        // *** APPLY THEME ***
+        roleComboBox.addActionListener(e -> cardLayout.show(dynamicPanel, (String)roleComboBox.getSelectedItem()));
         ThemeUtils.applyTheme(this.getContentPane());
-        
         setVisible(true);
     }
 
-    private void handleCreateUser() {
+    private void create() {
         String u = usernameField.getText();
         String p = new String(passwordField.getPassword());
-        String r = (String) roleComboBox.getSelectedItem();
+        if(u.isEmpty() || p.isEmpty()) { JOptionPane.showMessageDialog(this, "Missing Credentials"); return; }
         
         String res;
-        if ("Student".equals(r)) {
-            res = adminService.createNewUser(u, p, r, rollNoField.getText(), programField.getText(), yearField.getText());
+        if ("Student".equals(roleComboBox.getSelectedItem())) {
+             res = adminService.createNewUser(u, p, "Student", rollNoField.getText(), programField.getText(), yearField.getText());
         } else {
-            res = adminService.createNewUser(u, p, r, departmentField.getText());
+             res = adminService.createNewUser(u, p, "Instructor", departmentField.getText());
         }
-        
         JOptionPane.showMessageDialog(this, res);
         if(res.startsWith("SUCCESS")) dispose();
     }

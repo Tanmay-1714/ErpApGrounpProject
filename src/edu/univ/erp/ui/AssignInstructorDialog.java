@@ -1,32 +1,27 @@
 package edu.univ.erp.ui;
 
 import edu.univ.erp.service.AdminService;
-import edu.univ.erp.util.ThemeUtils; // Import Theme
+import edu.univ.erp.util.ThemeUtils;
 
 import javax.swing.*;
 import java.awt.*;
 
 public class AssignInstructorDialog extends JDialog {
-
-    private AdminService adminService;
+    private AdminService adminService = new AdminService();
     private JTextField sectionIdField, instructorIdField;
 
     public AssignInstructorDialog(JFrame parent) {
-        super(parent, "Admin: Assign Instructor", true);
-        adminService = new AdminService();
+        super(parent, "Assign Instructor", true);
         setSize(400, 200);
         setLocationRelativeTo(parent);
         setLayout(new BorderLayout(15, 15));
 
         JPanel panel = new JPanel(new GridLayout(2, 2, 10, 10));
         panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
-
         sectionIdField = new JTextField();
         instructorIdField = new JTextField();
-
-        panel.add(new JLabel("Section ID:"));     panel.add(sectionIdField);
-        panel.add(new JLabel("Instructor ID:"));  panel.add(instructorIdField);
-
+        panel.add(new JLabel("Section ID:")); panel.add(sectionIdField);
+        panel.add(new JLabel("Instructor ID:")); panel.add(instructorIdField);
         add(panel, BorderLayout.CENTER);
 
         JButton btn = new JButton("Assign");
@@ -35,9 +30,7 @@ public class AssignInstructorDialog extends JDialog {
         south.add(btn);
         add(south, BorderLayout.SOUTH);
 
-        // *** APPLY THEME ***
         ThemeUtils.applyTheme(this.getContentPane());
-
         setVisible(true);
     }
 
@@ -48,8 +41,6 @@ public class AssignInstructorDialog extends JDialog {
             String res = adminService.assignInstructor(sid, iid);
             JOptionPane.showMessageDialog(this, res);
             if(res.startsWith("SUCCESS")) dispose();
-        } catch (NumberFormatException e) {
-            JOptionPane.showMessageDialog(this, "IDs must be numbers.");
-        }
+        } catch (Exception e) { JOptionPane.showMessageDialog(this, "Invalid IDs"); }
     }
 }
