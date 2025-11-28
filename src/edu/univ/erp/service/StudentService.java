@@ -1,4 +1,5 @@
 package edu.univ.erp.service;
+
 import edu.univ.erp.auth.UserSession;
 import edu.univ.erp.data.EnrollmentDAO;
 import edu.univ.erp.data.SectionDAO;
@@ -18,9 +19,20 @@ public class StudentService {
     
     public String registerForSection(int sectionId) {
         if (adminService.isMaintenanceModeEnabled()) return "FAILURE: Maintenance Mode ON.";
+        
         int sid = UserSession.getInstance().getProfileId();
+        // DEBUG
+        System.out.println("DEBUG: Register Attempt. StudentID=" + sid + ", SectionID=" + sectionId);
+        
         if (eDao.isStudentEnrolled(sid, sectionId)) return "FAILURE: Already registered.";
-        return eDao.registerStudent(sid, sectionId) ? "SUCCESS" : "FAILURE";
+
+        int capacity = sDao.getSectionCapacity(sectionId);
+        int enrolled = eDao.getEnrollmentCount(sectionId);
+        
+        if (capacity == 0) return "FAILURE: Section closed/invalid.";
+        if (enrolled >= capacity) return "FAILURE: Section is FULL (" + enrolled + "/" + capacity + ")";
+
+        return eDao.registerStudent(sid, sectionId) ? "SUCCESS" : "FAILURE: DB Error";
     }
 
     public String dropSection(int sectionId) {
