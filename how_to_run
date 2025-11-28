@@ -1,0 +1,3 @@
+Use make compile to compile the code 
+use make run to run the compiled code 
+use make test to run the test cases in jupyter and get the verdict 
