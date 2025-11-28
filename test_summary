@@ -1,0 +1,35 @@
+╷
+├─ JUnit Platform Suite ✔
+├─ JUnit Jupiter ✔
+│  └─ AppTest ✔
+│     ├─ test12_Instructor_CannotAssignInstructor() ✔
+│     ├─ test8_CreateUser_Student_MissingDetails() ✔
+│     ├─ test14_MaintenanceMode_BlocksStudentRegistration() ✔
+│     ├─ test3_CreateSection_InvalidYear_Past() ✔
+│     ├─ test7_CreateUser_Student_YearOutOfRange() ✔
+│     ├─ test11_Student_CannotToggleMaintenance() ✔
+│     ├─ test15_MaintenanceMode_BlocksInstructorGrading() ✔
+│     ├─ test9_Student_CannotCreateCourse() ✔
+│     ├─ test1_CreateSection_NegativeCapacity() ✔
+│     ├─ test4_CreateCourse_NegativeCredits() ✔
+│     ├─ test13_Instructor_CannotCreateSection() ✔
+│     ├─ test2_CreateSection_ZeroCapacity() ✔
+│     ├─ test6_CreateUser_Student_InvalidYear() ✔
+│     ├─ test10_Student_CannotCreateUser() ✔
+│     └─ test5_CreateCourse_ZeroCredits() ✔
+└─ JUnit Vintage ✔
+
+Test run finished after 846 ms
+[         4 containers found      ]
+[         0 containers skipped    ]
+[         4 containers started    ]
+[         0 containers aborted    ]
+[         4 containers successful ]
+[         0 containers failed     ]
+[        15 tests found           ]
+[         0 tests skipped         ]
+[        15 tests started         ]
+[         0 tests aborted         ]
+[        15 tests successful      ]
+[         0 tests failed          ]
+
