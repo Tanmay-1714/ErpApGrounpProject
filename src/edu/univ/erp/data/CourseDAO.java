@@ -5,36 +5,32 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Handles database operations for the 'courses' table.
- */
 public class CourseDAO {
 
-    /**
-     * Inserts a new course into the database.
-     * @return true if successful, false otherwise.
-     */
-    public boolean createCourse(String code, String title, double credits) {
+    public int createCourse(String code, String title, double credits) {
         final String SQL = "INSERT INTO courses (code, title, credits) VALUES (?, ?, ?)";
 
         try (Connection conn = DBConnection.getERPDBConnection();
-             PreparedStatement stmt = conn.prepareStatement(SQL)) {
+             PreparedStatement stmt = conn.prepareStatement(SQL, Statement.RETURN_GENERATED_KEYS)) {
 
             stmt.setString(1, code);
             stmt.setString(2, title);
             stmt.setDouble(3, credits);
 
-            return stmt.executeUpdate() > 0;
-
+            int affectedRows = stmt.executeUpdate();
+            if (affectedRows > 0) {
+                try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
+                    if (generatedKeys.next()) {
+                        return generatedKeys.getInt(1); // Return the new Course ID
+                    }
+                }
+            }
         } catch (SQLException e) {
             System.err.println("Error creating course: " + e.getMessage());
-            return false;
         }
+        return -1; // Failure
     }
 
-    /**
-     * Retrieves all courses. Useful for listing in the UI or for dropdowns.
-     */
     public List<Course> getAllCourses() {
         List<Course> courses = new ArrayList<>();
         final String SQL = "SELECT * FROM courses ORDER BY code ASC";
@@ -57,15 +53,10 @@ public class CourseDAO {
         return courses;
     }
 
-    /**
-     * Finds a course by its ID.
-     */
     public Course getCourseById(int courseId) {
         final String SQL = "SELECT * FROM courses WHERE course_id = ?";
-
         try (Connection conn = DBConnection.getERPDBConnection();
              PreparedStatement stmt = conn.prepareStatement(SQL)) {
-
             stmt.setInt(1, courseId);
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {

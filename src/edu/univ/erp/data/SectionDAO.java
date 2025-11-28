@@ -20,7 +20,7 @@ public class SectionDAO {
             System.err.println("DEBUG: Failed to get capacity for section " + sectionId);
             e.printStackTrace(); 
         }
-        return 0; // Fallback (Closed)
+        return 0; 
     }
 
     public List<Section> getAllSections() {
@@ -42,12 +42,20 @@ public class SectionDAO {
         return sections;
     }
 
-    public boolean createSection(int cid, String d, String t, String r, int cap, String s, int y) {
+    public int createSection(int cid, String d, String t, String r, int cap, String s, int y) {
         String sql = "INSERT INTO sections (course_id, instructor_id, day, time, room, capacity, semester, year) VALUES (?, 0, ?, ?, ?, ?, ?, ?)";
-        try (Connection conn = DBConnection.getERPDBConnection(); PreparedStatement stmt = conn.prepareStatement(sql)) {
+        try (Connection conn = DBConnection.getERPDBConnection(); 
+             PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             stmt.setInt(1, cid); stmt.setString(2, d); stmt.setString(3, t); stmt.setString(4, r); stmt.setInt(5, cap); stmt.setString(6, s); stmt.setInt(7, y);
-            return stmt.executeUpdate() > 0;
-        } catch (SQLException e) { return false; }
+            
+            int affected = stmt.executeUpdate();
+            if(affected > 0) {
+                try (ResultSet rs = stmt.getGeneratedKeys()) {
+                    if(rs.next()) return rs.getInt(1); // Return Section ID
+                }
+            }
+        } catch (SQLException e) { e.printStackTrace(); }
+        return -1;
     }
 
     public boolean assignInstructorToSection(int sid, int iid) {

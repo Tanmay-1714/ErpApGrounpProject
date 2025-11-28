@@ -15,37 +15,83 @@ public class AdminService {
     private EnrollmentDAO enrollmentDAO = new EnrollmentDAO();
 
     public String toggleMaintenanceMode(boolean enabled) {
-        if (!"Admin".equals(UserSession.getInstance().getRole())) return "FAILURE";
-        return systemDAO.setMaintenanceMode(enabled) ? "SUCCESS: Maintenance " + (enabled ? "ON" : "OFF") : "ERROR";
+        if (!"Admin".equals(UserSession.getInstance().getRole())) 
+            return "FAILURE: Only administrators are authorized to change system settings.";
+        
+        boolean success = systemDAO.setMaintenanceMode(enabled);
+        return success ? "SUCCESS: Maintenance Mode set to " + (enabled ? "ON" : "OFF") 
+                       : "ERROR: Database update failed. Could not change Maintenance Mode.";
     }
 
     public boolean isMaintenanceModeEnabled() { return systemDAO.isMaintenanceModeEnabled(); }
 
     public String createNewUser(String u, String p, String r, String... details) {
-        if (!"Admin".equals(UserSession.getInstance().getRole())) return "FAILURE";
-        int uid = authService.createBaseUser(u, p, r);
-        if (uid == -1) return "FAILURE: User exists.";
+        if (!"Admin".equals(UserSession.getInstance().getRole())) 
+            return "FAILURE: Only administrators are authorized to create new users.";
         
-        boolean ok = false;
+        int uid = authService.createBaseUser(u, p, r);
+        if (uid == -1) return "FAILURE: User creation in Authentication DB failed (Username may exist or DB error).";
+        
+        int profileId = -1;
+        
         if ("Student".equalsIgnoreCase(r) && details.length >= 3) {
-            try { ok = userDAO.createStudentProfile(uid, details[0], details[1], Integer.parseInt(details[2])); } 
-            catch (Exception e) {}
+            try {
+                int year = Integer.parseInt(details[2]);
+                // VALIDATION: Check for negative/nonsensical year
+                if (year < 2000 || year > 2100) {
+                     return "FAILURE: Year must be between 2000 and 2100.";
+                }
+                profileId = userDAO.createStudentProfile(uid, details[0], details[1], year);
+                if (profileId > 0) {
+                    return "SUCCESS: User '" + u + "' created successfully with Student profile. UserID: " + uid + ", StudentID: " + profileId;
+                }
+            } catch (NumberFormatException e) {
+                return "FAILURE: Invalid year format.";
+            }
         } else if ("Instructor".equalsIgnoreCase(r) && details.length >= 1) {
-            ok = userDAO.createInstructorProfile(uid, details[0]);
+            profileId = userDAO.createInstructorProfile(uid, details[0]);
+            if (profileId > 0) {
+                 return "SUCCESS: User '" + u + "' created successfully with Instructor profile. UserID: " + uid + ", InstructorID: " + profileId;
+            }
+        } else {
+            return "FAILURE: Invalid profile details provided for role: " + r;
         }
-        return ok ? "SUCCESS" : "FAILURE: Profile Error";
+        
+        return "FAILURE: Profile creation failed. User '" + u + "' created but profile data missing/invalid.";
     }
 
     public String createNewCourse(String c, String t, double cr) {
-        return courseDAO.createCourse(c, t, cr) ? "SUCCESS" : "FAILURE";
+        if (!"Admin".equals(UserSession.getInstance().getRole())) 
+            return "FAILURE: Only administrators are authorized to create new courses.";
+        
+        // VALIDATION: Negative check
+        if (cr <= 0) return "FAILURE: Course must have positive credit hours.";
+        
+        int id = courseDAO.createCourse(c, t, cr);
+        return (id > 0) ? "SUCCESS: Course " + id + " (" + c + ") created successfully." 
+                        : "FAILURE: Course creation failed. Check if course code '" + c + "' already exists.";
     }
 
     public String createNewSection(int cid, String d, String t, String r, int cap, String s, int y) {
-        return sectionDAO.createSection(cid, d, t, r, cap, s, y) ? "SUCCESS" : "FAILURE";
+        if (!"Admin".equals(UserSession.getInstance().getRole())) 
+             return "FAILURE: Only administrators are authorized to create new sections.";
+        
+        // VALIDATION: Negative/Logical checks
+        if (cap <= 0) return "FAILURE: Section capacity must be greater than zero.";
+        if (y < 2000) return "FAILURE: Invalid year (must be > 2000).";
+
+        int id = sectionDAO.createSection(cid, d, t, r, cap, s, y);
+        return (id > 0) ? "SUCCESS: New section for Course ID " + cid + " created successfully. Section ID: " + id
+                        : "FAILURE: Section creation failed due to a database error or invalid input.";
     }
 
     public String assignInstructor(int sid, int iid) {
-        return sectionDAO.assignInstructorToSection(sid, iid) ? "SUCCESS" : "FAILURE";
+        if (!"Admin".equals(UserSession.getInstance().getRole())) 
+            return "FAILURE: Only administrators are authorized to assign instructors.";
+            
+        return sectionDAO.assignInstructorToSection(sid, iid) 
+                ? "SUCCESS: Instructor ID " + iid + " assigned to Section ID " + sid + "." 
+                : "FAILURE: Instructor assignment failed. Check if Section ID or Instructor ID are valid.";
     }
 
     public List<Enrollment> getAllEnrollments() { return enrollmentDAO.getAllEnrollments(); }
